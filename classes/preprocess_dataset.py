@@ -4,10 +4,14 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from os import listdir, makedirs
+from os import listdir, makedirs, path
 
-class ProcessData:
-    ''' Class to process a dataset of images by applying quality checks and resizing '''
+class PreprocessDataset:
+    ''' Preprocesses a dataset of images by applying quality checks and resizing '''
+    
+    def __init__(self, root_dir: str, processed_dir: str):
+        self.root_dir = root_dir
+        self.processed_dir = processed_dir
     
     def check_aspect_ratio(self, img: MatLike, min_ratio: float = 0.5, max_ratio: float = 2.0) -> bool:
         ''' Checks if the image aspect ratio is within the specified range. '''
@@ -66,17 +70,19 @@ class ProcessData:
     def run(self):
         ''' Processes the dataset by applying quality checks and resizing images '''
         
-        raw_dir = 'data/raw/'
-        processed_dir = 'data/processed/'
+        if path.exists(self.processed_dir):
+            print('Processed directory already exists. Skipping preprocessing.')
+            
+            return
         
-        makedirs(f'{processed_dir}', exist_ok=True)
+        makedirs(f'{self.processed_dir}', exist_ok=True)
         
-        for folder in listdir(raw_dir):
+        for folder in listdir(self.root_dir):
             if '.' in folder:
                 continue
             
-            for file in tqdm(listdir(f'{raw_dir}/{folder}'), desc=f"Processando {folder}"):
-                img = cv2.imread(f'{raw_dir}/{folder}/{file}')
+            for file in tqdm(listdir(f'{self.root_dir}/{folder}'), desc=f'Processing {folder}'):
+                img = cv2.imread(f'{self.root_dir}/{folder}/{file}')
                 
                 if img is None:
                     continue
@@ -95,5 +101,5 @@ class ProcessData:
                 if not self.check_colorfulness(img):
                     continue
                  
-                cv2.imwrite(f'{processed_dir}/{file}', self.resize(img))
+                cv2.imwrite(f'{self.processed_dir}/{file}', self.resize(img))
                 
