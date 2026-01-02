@@ -5,7 +5,7 @@ from torch.optim import Adam
 from tqdm import tqdm
 
 from classes.preprocess_dataset import PreprocessDataset
-from classes.process_dataset import ProcessDataset
+from classes.images_dataset import ProcessDataset
 
 from classes.color_blindness_simulator import ColorBlindnessSimulator
 from classes.color_correction_model import ColorCorrectionModel

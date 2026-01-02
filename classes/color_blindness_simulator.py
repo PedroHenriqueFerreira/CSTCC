@@ -54,18 +54,16 @@ class ColorBlindnessSimulator(nn.Module):
         
         B, _, H, W = x.shape
         
-        # (B, 3, H, W) -> (B, H, W, 3)
+        # (B, 3, H, W) -> (B, H*W, 3)
         x = x.permute(0, 2, 3, 1)
-        # (B, H, W, 3) -> (B, H*W, 3)
         x = x.reshape(B, H * W, 3)
         
         x = self.rgb_to_linear(x)
         x = torch.bmm(x, self.matrices[type])
         x = self.linear_to_rgb(x)
         
-        # (B, H*W, 3) -> (B, H, W, 3)
+        # (B, H*W, 3) -> (B, 3, H, W)
         x = x.reshape(B, H, W, 3)
-        # (B, H, W, 3) -> (B, 3, H, W)
         x = x.permute(0, 3, 1, 2)
         
         return x.clamp(0.0, 1.0)
