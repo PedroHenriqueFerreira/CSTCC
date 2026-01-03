@@ -1,7 +1,10 @@
-import cv2
-import torch
-
+from torch import Tensor
 from torch.utils.data import Dataset
+
+from torchvision.io import read_image
+from torchvision.utils import save_image
+from torchvision.transforms.functional import resize, pad
+
 from os import listdir, path, makedirs
 from tqdm import tqdm
 
@@ -18,95 +21,44 @@ class ImagesDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx: int):
-        path = self.images[idx]
-
-        return self.image_to_tensor(self.read_image(path))
+        return read_image(self.images[idx]).float() / 255.0
     
-    def read_image(self, path: str) -> cv2.Mat:
-        ''' Reads an image from the specified path and converts it from BGR to RGB '''
-        
-        img = cv2.imread(path, cv2.IMREAD_COLOR)
-        
-        if img is None:
-            return None
-        
-        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
-    def image_to_tensor(self, img: cv2.Mat):
-        ''' Processes an image to a tensor by permuting dimensions and normalizing '''
-        
-        return torch.from_numpy(img.astype('float32') / 255.0).permute(2, 0, 1)
-    
-    def tensor_to_image(self, tensor: torch.Tensor) -> cv2.Mat:
-        ''' Converts a tensor back to an image by permuting dimensions and denormalizing '''
-        
-        img = tensor.permute(1, 2, 0).cpu().numpy() * 255.0
-        return img.astype('uint8')
-    
-    def save_image(self, img: cv2.Mat, path: str):
-        ''' Saves an image to the specified path after converting it from RGB to BGR '''
-        
-        cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-    
-    def resize_image(self, img: cv2.Mat, size = 512, color = 256) -> cv2.Mat:
+    @staticmethod
+    def prepare_image(img: Tensor, size = 512, fill = 255) -> Tensor:
         ''' Resizes an image to the specified size with padding '''
         
-        h, w = img.shape[:2]
-
+        h, w = img.shape[1:3]
         scale = size / max(h, w)
         new_w, new_h = int(w * scale), int(h * scale)
 
-        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-        pad_h = size - new_h
-        pad_w = size - new_w
-
-        top = pad_h // 2
-        bottom = pad_h - top
-        left = pad_w // 2
-        right = pad_w - left
-
-        return cv2.copyMakeBorder(
-            resized, 
-            top, bottom, left, right, cv2.BORDER_CONSTANT, 
-            value=[color, color, color]
-        )
+        img = resize(img, (new_h, new_w))
+        
+        pad_w, pad_h = size - new_w, size - new_h
+        left, top = pad_w // 2, pad_h // 2
     
-    def check_image_aspect(self, img: cv2.Mat, min_ratio: float = 0.5, max_ratio: float = 2.0) -> bool:
+        return pad(img, (left, top, pad_w - left, pad_h - top), fill=fill)
+    
+    @staticmethod
+    def check_image_aspect(img: Tensor, min_ratio = 0.5, max_ratio = 2.0):
         ''' Checks if the image aspect ratio is within the specified range. '''
         
-        aspect_ratio = img.shape[0] / img.shape[1]
-        return min_ratio <= aspect_ratio <= max_ratio
+        return min_ratio <= (img.shape[2] / img.shape[1]) <= max_ratio
 
-    def check_image_saturation(self, s: cv2.Mat, min_mean: float = 30.0) -> bool:
-        ''' Checks if the mean saturation is above the specified threshold. '''
-        
-        return s.mean() >= min_mean
-
-    def check_image_hue(self, h: cv2.Mat, s: cv2.Mat, v: cv2.Mat, min_std: float = 10.0) -> bool:
-        ''' Checks if the hue channel variance is above the specified threshold '''
-        
-        mask_sv = (s > 20) & (v > 20)
-        
-        if not mask_sv.any():
-            return False
-        
-        return h[mask_sv].std() >= min_std
-
-    def check_image_colorfulness(self, img: cv2.Mat, threshold: float = 45.0) -> bool:
+    @staticmethod
+    def check_image_colorfulness(img: Tensor, threshold = 45.0) -> bool:
         ''' Checks if the image colorfulness is above the specified threshold '''
         
-        B, G, R = cv2.split(img.astype('float'))
+        r, g, b = img
         
-        rg = abs(R - G)
-        yb = abs(0.5 * (R + G) - B)
+        rg = (r - g).abs()
+        yb = (0.5 * (r + g) - b).abs()
         
-        stdRGYB = ((rg.std() ** 2 + yb.std() ** 2)) ** 0.5
-        meanRGYB = ((rg.mean() ** 2 + yb.mean() ** 2)) ** 0.5
+        stdRGYB = (rg.var() + yb.var()).sqrt()
+        meanRGYB = (rg.mean() ** 2 + yb.mean() ** 2).sqrt()
         
         return stdRGYB + 0.3 * meanRGYB >= threshold
     
-    def preprocess(self):
+    def preprocess(self, device: str):
         ''' Processes the root directory images and saves them to the processed directory '''
         
         print('Starting dataset preprocessing...')
@@ -120,30 +72,17 @@ class ImagesDataset(Dataset):
             makedirs(f'{self.processed_dir}', exist_ok=True)
             
             for folder in listdir(self.root_dir):
-                if '.' in folder:
+                if not path.isdir(f'{self.root_dir}/{folder}'):
                     continue
                 
-                for file in tqdm(listdir(f'{self.root_dir}/{folder}'), desc=f'Processing {folder}'):
-                    img = self.read_image(f'{self.root_dir}/{folder}/{file}')
-                
-                    if img is None:
+                for file in tqdm(listdir(f'{self.root_dir}/{folder}'), desc=f'Processing [{folder}]'):
+                    img = read_image(f'{self.root_dir}/{folder}/{file}').float().to(device)
+                              
+                    if not self.check_image_aspect(img) or not self.check_image_colorfulness(img): 
                         continue
                     
-                    h, s, v = cv2.split(cv2.cvtColor(img, cv2.COLOR_RGB2HSV))
+                    save_image(self.prepare_image(img) / 255.0, f'{self.processed_dir}/{folder}_{file}')
                     
-                    if not self.check_image_aspect(img): 
-                        continue
-                    
-                    if not self.check_image_saturation(s):
-                        continue
-                    
-                    if not self.check_image_hue(h, s, v):
-                        continue
-                    
-                    if not self.check_image_colorfulness(img):
-                        continue
-            
-                    self.save_image(self.resize_image(img), f'{self.processed_dir}/{file}')
                     
         self.images = [f'{self.processed_dir}/{file}' for file in listdir(self.processed_dir)]
 

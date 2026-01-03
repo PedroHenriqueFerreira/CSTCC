@@ -13,8 +13,8 @@ from classes.perceptual_losses import PerceptualLosses
 def main(batch_size: int = 10, epochs: int = 20):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    images_dataset = ImagesDataset('dataset/raw', 'dataset/processed')
-    images_dataset.preprocess()
+    images_dataset = ImagesDataset('datasets/raw', 'datasets/processed')
+    images_dataset.preprocess(device=device)
 
     loader = DataLoader(
         images_dataset,
@@ -32,11 +32,13 @@ def main(batch_size: int = 10, epochs: int = 20):
     
     adam_optimizer = Adam(color_correction_model.parameters(), lr=1e-4)
 
-    test_x = images_dataset.image_to_tensor(images_dataset.read_image('image.jpg')).to(device)
-    test_x = test_x.unsqueeze(0)
+    test_x = Utils.image_to_tensor(Utils.read_image('image.jpg')).to(device)
+    test_type = torch.tensor([0, 1, 2, 3]).to(device)
     
-    test_x = torch.cat([test_x, test_x, test_x, test_x], dim=0)
-    test_type = torch.tensor([0, 1, 2, 3], device=device)
+    test_x = torch.hstack([test_x, test_x, test_x, test_x], dim=0)
+    
+    with torch.no_grad():
+        s_test_x = color_blindness_simulator(test_x, test_type)
     
     for epoch in range(epochs):
         total_loss = 0.0
@@ -66,6 +68,15 @@ def main(batch_size: int = 10, epochs: int = 20):
                 r_test = color_correction_model(test_x, test_type)
                 s_test = color_blindness_simulator(test_x, test_type)
                 s_r_test = color_blindness_simulator(r_test, test_type)
+
+                Utils.save_images(
+                    [images_dataset.tensor_to_image(r_test[i]) for i in range(4)] +
+                    [images_dataset.tensor_to_image(s_test[i]) for i in range(4)] +
+                    [images_dataset.tensor_to_image(s_r_test[i]) for i in range(4)],
+                    [f'test_type_{i}_corrected.jpg' for i in range(4)] +
+                    [f'test_type_{i}_simulated.jpg' for i in range(4)] +
+                    [f'test_type_{i}_corrected_simulated.jpg' for i in range(4)]
+                )
                 
                 for i in range(4):
                     images_dataset.save_image(images_dataset.tensor_to_image(r_test[i]), f'test_type_{i}_corrected.jpg')

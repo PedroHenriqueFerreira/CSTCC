@@ -30,17 +30,17 @@ class ResNetLoss(nn.Module):
         for p in self.resnet.parameters():
             p.requires_grad = False
 
-        self.blocks = nn.ModuleDict({
-            "layer1": nn.Sequential(
-                self.resnet.conv1, 
-                self.resnet.bn1, 
-                self.resnet.relu,
-                self.resnet.maxpool, 
-                self.resnet.layer1
-            ),
-            "layer2": self.resnet.layer2,
-            "layer3": self.resnet.layer3,
-        })
+        # self.blocks = nn.ModuleDict({
+        #     "layer1": nn.Sequential(
+        #         self.resnet.conv1, 
+        #         self.resnet.bn1, 
+        #         self.resnet.relu,
+        #         self.resnet.maxpool, 
+        #         self.resnet.layer1
+        #     ),
+        #     "layer2": self.resnet.layer2,
+        #     "layer3": self.resnet.layer3,
+        # })
             
         # self.register_buffer('mean', torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
         # self.register_buffer('std', tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
@@ -52,18 +52,18 @@ class ResNetLoss(nn.Module):
         x = self.transforms(x)
         y = self.transforms(y)
     
-        loss = 0.0
+        # loss = 0.0
         
-        x_feat = x
-        y_feat = y
+        # x_feat = x
+        # y_feat = y
         
-        for block in self.blocks.values():
-            x_feat = block(x_feat)
-            y_feat = block(y_feat)
+        # for block in self.blocks.values():
+        #     x_feat = block(x_feat)
+        #     y_feat = block(y_feat)
             
-            loss += self.l1_loss(x_feat, y_feat)
+        #     loss += self.l1_loss(x_feat, y_feat)
             
-        return loss
+        return self.l1_loss(self.resnet(x), self.resnet(y))
     
 class LabLoss(nn.Module):
     ''' Perceptual Loss using CIELAB color space '''
