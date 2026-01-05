@@ -22,12 +22,12 @@ def preprocess(
     root_path = Path(root_dir)
     processed_path = Path(processed_dir)
     
-    loader = DataLoader(ImageDataset(root_path), batch_size, num_workers=4, pin_memory=True)
-
     if processed_path.exists():
         print('Images have already been preprocessed!')
         return
-        
+    
+    loader = DataLoader(ImageDataset(root_path), batch_size, num_workers=4, pin_memory=True)
+
     saved_images: set[Path] = set()
             
     processed_path.mkdir(parents=True, exist_ok=True)
@@ -74,6 +74,8 @@ def preprocess(
             move(image_path, val_dir / image_path.name)
         else:
             move(image_path, test_dir / image_path.name)
+                
+    print('Successfully preprocessed images!')
                 
 if __name__ == '__main__':
     preprocess()

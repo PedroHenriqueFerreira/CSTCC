@@ -77,7 +77,7 @@ class ColorCorrectionModel(nn.Module):
         '''
 
         # One-hot -> embedding
-        t = self.type_embedding(one_hot(type, self.num_types).float())
+        t = self.type_embedding(one_hot(type, 4).float())
 
         # Encoder with conditioning
         x1 = self.enc1(self.join(x, t))
