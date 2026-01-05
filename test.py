@@ -4,8 +4,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from tqdm import tqdm
 
-from classes.preprocess_dataset import PreprocessDataset
-from classes.images_dataset import ProcessDataset
+from classes.image_dataset import ProcessDataset
 
 from classes.color_blindness_simulator import ColorBlindnessSimulator
 from classes.color_correction_model import ColorCorrectionModel
@@ -16,6 +15,8 @@ import cv2
 batch_size = 10
 
 dataset = ProcessDataset('dataset/processed')
+dataset.preprocess()
+
 loader = DataLoader(
     dataset,
     batch_size=batch_size,

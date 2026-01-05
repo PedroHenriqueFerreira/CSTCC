@@ -2,7 +2,6 @@ import torch
 from torch import nn, tensor, Tensor
 
 from kornia.color import rgb_to_linear_rgb,  linear_rgb_to_rgb
-from kornia.color import rgb_to_hsv
 
 class ColorBlindnessSimulator(nn.Module):
     ''' Color Vision Deficiency Simulator Based on Machado et al. (2009) '''
