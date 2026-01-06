@@ -30,17 +30,27 @@ class ResNetLoss(nn.Module):
         for p in self.resnet.parameters():
             p.requires_grad = False
            
-        self.blocks = nn.ModuleList([
-            nn.Sequential(
-                self.resnet.conv1, 
-                self.resnet.bn1, 
-                self.resnet.relu,
-                self.resnet.maxpool,
-            ),
-            self.resnet.layer1,
-            self.resnet.layer2,
-            self.resnet.layer3,
-        ])
+        # self.resnett = nn.Sequential(
+        #     self.resnet.conv1,
+        #     self.resnet.bn1,
+        #     self.resnet.relu,
+        #     self.resnet.maxpool,
+        #     self.resnet.layer1,
+        #     self.resnet.layer2,
+        #     self.resnet.layer3,
+        # )
+           
+        # self.blocks = nn.ModuleList([
+        #     nn.Sequential(
+        #         self.resnet.conv1, 
+        #         self.resnet.bn1, 
+        #         self.resnet.relu,
+        #         self.resnet.maxpool,
+        #     ),
+        #     self.resnet.layer1,
+        #     self.resnet.layer2,
+        #     self.resnet.layer3,
+        # ])
             
         # self.register_buffer('mean', tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
         # self.register_buffer('std', tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
@@ -49,18 +59,18 @@ class ResNetLoss(nn.Module):
         x = self.transforms(x)
         y = self.transforms(y)  
     
-        loss = 0.0
+        # loss = 0.0
         
-        for block in self.blocks:
-            x = block(x)
-            y = block(y)
+        # for block in self.blocks:
+        #     x = block(x)
+        #     y = block(y)
             
-            loss += self.l1_loss(x, y)
+        #     loss += self.l1_loss(x, y)
 
-        return loss
+        # return loss
           
         
-        # return self.l1_loss(self.resnet(x), self.resnet(y))
+        return self.l1_loss(self.resnet(x), self.resnet(y))
     
 class LabLoss(nn.Module):
     ''' Perceptual Loss using CIELAB color space '''

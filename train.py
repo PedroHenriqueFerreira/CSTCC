@@ -38,10 +38,13 @@ def run_epoch(
         progress_bar = tqdm(loader, desc='Training' if train else 'Validation', leave=False)
         
         for x, _ in progress_bar:
+            if train:
+                model.train()
+            
             x = x.to(device, non_blocking=True)
             
             type = torch.randint(0, 4, (x.size(0),), device=device)
-        
+
             corrected = model(x, type)
             simulated_corrected = simulator(corrected, type)
             loss = criterion(x, simulated_corrected)
@@ -54,24 +57,33 @@ def run_epoch(
             total_loss += loss.item()
             
             progress_bar.set_postfix(loss=loss.item())
+            
+            preview(model, simulator, device)
         
     return total_loss / len(loader)
 
 def preview(model: Module, simulator: Module, device: str):
-    image = image_transform(read_image('image.jpg')).to(device)
+    image_path = Path('preview/image.jpg')
+    
+    if not image_path.exists():
+        return
+    
+    image = image_transform(read_image(image_path)).to(device)
     
     x = image.unsqueeze(0).repeat(4, 1, 1, 1)
     types = torch.tensor([0, 1, 2, 3], device=device)
     
+    model.eval()
     with torch.inference_mode():
         corrected = model(x, types)
         simulated = simulator(x, types)
         
         simulated_corrected = simulator(corrected, types)
         
-        images = torch.cat([x, simulated, corrected, simulated_corrected], dim=0)
-        
-        save_image(images, 'preview.png', nrow=4)
+        for i in range(4):
+            group = torch.stack([x[i], corrected[i], simulated[i], simulated_corrected[i]], dim=0)
+            
+            save_image(group, f'preview/preview_{i}.jpg', nrow=2)
 
 def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: int = 20):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -106,9 +118,9 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: in
     
     print('Number of trainable parameters in Color Correction Model:', total_params)
     
-    color_blindness_simulator = torch.compile(color_blindness_simulator)
-    color_correction_model = torch.compile(color_correction_model)
-    perceptual_losses = torch.compile(perceptual_losses)
+    # color_blindness_simulator = torch.compile(color_blindness_simulator)
+    # color_correction_model = torch.compile(color_correction_model)
+    # perceptual_losses = torch.compile(perceptual_losses)
     
     adam_optimizer = Adam(color_correction_model.parameters(), lr=1e-4)
 
@@ -138,8 +150,6 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: in
             train=False,
             device=device
         )
-        
-        preview(color_correction_model, color_blindness_simulator, device)
                 
         print(f'Epoch [{epoch + 1}/{epochs}], Loss: {train_loss:.5f}, Val Loss: {val_loss:.5f}')
         
