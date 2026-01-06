@@ -28,13 +28,15 @@ class ToSquare:
             padding_mode=self.padding_mode
         )
     
+image_transform = v2.Compose([
+    v2.ToImage(),
+    ToSquare(),
+    v2.ToDtype(float32, scale=True),    
+])
+    
 class ImageDataset(ImageFolder):
     def __init__(self, root: str):
-        super().__init__(root=root, transform=v2.Compose([
-            v2.ToImage(),
-            ToSquare(),
-            v2.ToDtype(float32, scale=True),    
-        ]))
+        super().__init__(root=root, transform=image_transform)
     
     def __getitem__(self, index):
         return super().__getitem__(index)[0], self.samples[index][0]

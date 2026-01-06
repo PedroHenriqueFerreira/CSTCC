@@ -24,7 +24,7 @@ class ResNetLoss(nn.Module):
         self.l1_loss = L1Loss()
 
         resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
-        # self.transforms = ResNet50_Weights.DEFAULT.transforms()
+        self.transforms = ResNet50_Weights.DEFAULT.transforms()
         
         resnet.eval()
         for p in resnet.parameters():

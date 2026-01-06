@@ -14,7 +14,7 @@ from pathlib import Path
 from classes.color_blindness_simulator import ColorBlindnessSimulator
 from classes.color_correction_model import ColorCorrectionModel
 from classes.perceptual_losses import PerceptualLosses
-from classes.image_dataset import ImageDataset
+from classes.image_dataset import ImageDataset, image_transform
 
 def run_epoch(
     loader: DataLoader, 
@@ -58,9 +58,25 @@ def run_epoch(
         
     return total_loss / len(loader)
 
-def train(processed_dir = 'datasets/processed', batch_size: int = 8, epochs: int = 20):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+def preview(model: Module, simulator: Module, device: str):
+    image = image_transform(read_image('image.jpg')).to(device)
     
+    x = image.unsqueeze(0).repeat(4, 1, 1, 1)
+    types = torch.tensor([0, 1, 2, 3], device=device)
+    
+    with torch.inference_mode():
+        corrected = model(x, types)
+        simulated = simulator(x, types)
+        
+        simulated_corrected = simulator(corrected, types)
+        
+        images = torch.cat([x, simulated, corrected, simulated_corrected], dim=0)
+        
+        save_image(images, 'preview.png', nrow=4)
+
+def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: int = 20):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
     processed_path = Path(processed_dir)
     
     train_dataset = ImageDataset(processed_path / 'train')
@@ -91,9 +107,9 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 8, epochs: int
     
     print('Number of trainable parameters in Color Correction Model:', total_params)
     
-    color_blindness_simulator = torch.compile(color_blindness_simulator)
-    color_correction_model = torch.compile(color_correction_model)
-    perceptual_losses = torch.compile(perceptual_losses)
+    # color_blindness_simulator = torch.compile(color_blindness_simulator)
+    # color_correction_model = torch.compile(color_correction_model)
+    # perceptual_losses = torch.compile(perceptual_losses)
     
     adam_optimizer = Adam(color_correction_model.parameters(), lr=1e-4)
 
@@ -123,6 +139,8 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 8, epochs: int
             train=False,
             device=device
         )
+        
+        preview(color_correction_model, color_blindness_simulator, device)
                 
         print(f'Epoch [{epoch + 1}/{epochs}], Loss: {train_loss:.5f}, Val Loss: {val_loss:.5f}')
         
@@ -136,4 +154,5 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 8, epochs: int
 if __name__ == '__main__':
     torch.backends.cudnn.benchmark = True
     torch.set_float32_matmul_precision('high')
+    torch.cuda.empty_cache()
     train()
