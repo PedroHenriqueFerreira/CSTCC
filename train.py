@@ -44,9 +44,8 @@ def run_epoch(
         
             corrected = model(x, type)
             simulated_corrected = simulator(corrected, type)
-        
             loss = criterion(x, simulated_corrected)
-            
+    
             if train:
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -99,17 +98,17 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: in
     )
 
     color_blindness_simulator = ColorBlindnessSimulator().to(device).eval()
-    color_correction_model = ColorCorrectionModel().to(device)
     perceptual_losses = PerceptualLosses().to(device).eval()
+    color_correction_model = ColorCorrectionModel().to(device)
     
     # NUMBER OF PARAMETERS
     total_params = sum(p.numel() for p in color_correction_model.parameters() if p.requires_grad)
     
     print('Number of trainable parameters in Color Correction Model:', total_params)
     
-    # color_blindness_simulator = torch.compile(color_blindness_simulator)
-    # color_correction_model = torch.compile(color_correction_model)
-    # perceptual_losses = torch.compile(perceptual_losses)
+    color_blindness_simulator = torch.compile(color_blindness_simulator)
+    color_correction_model = torch.compile(color_correction_model)
+    perceptual_losses = torch.compile(perceptual_losses)
     
     adam_optimizer = Adam(color_correction_model.parameters(), lr=1e-4)
 

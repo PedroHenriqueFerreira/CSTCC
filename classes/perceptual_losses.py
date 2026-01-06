@@ -23,36 +23,34 @@ class ResNetLoss(nn.Module):
 
         self.l1_loss = L1Loss()
 
-        resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
+        self.resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
         self.transforms = ResNet50_Weights.DEFAULT.transforms()
         
-        resnet.eval()
-        for p in resnet.parameters():
+        self.resnet.eval()
+        for p in self.resnet.parameters():
             p.requires_grad = False
            
         self.blocks = nn.ModuleList([
             nn.Sequential(
-                resnet.conv1, 
-                resnet.bn1, 
-                resnet.relu,
-                resnet.maxpool,
+                self.resnet.conv1, 
+                self.resnet.bn1, 
+                self.resnet.relu,
+                self.resnet.maxpool,
             ),
-            resnet.layer1,
-            resnet.layer2,
-            resnet.layer3,
+            self.resnet.layer1,
+            self.resnet.layer2,
+            self.resnet.layer3,
         ])
             
-        self.register_buffer('mean', tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
-        self.register_buffer('std', tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
-
-    def normalize(self, x: Tensor) -> Tensor:
-        return (x - self.mean) / self.std
+        # self.register_buffer('mean', tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+        # self.register_buffer('std', tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
 
     def forward(self, x: Tensor, y: Tensor) -> Tensor:
-        x = self.normalize(x)
-        y = self.normalize(y)
+        x = self.transforms(x)
+        y = self.transforms(y)  
     
         loss = 0.0
+        
         for block in self.blocks:
             x = block(x)
             y = block(y)
@@ -61,8 +59,7 @@ class ResNetLoss(nn.Module):
 
         return loss
           
-        # x = self.transforms(x)
-        # y = self.transforms(y)  
+        
         # return self.l1_loss(self.resnet(x), self.resnet(y))
     
 class LabLoss(nn.Module):
