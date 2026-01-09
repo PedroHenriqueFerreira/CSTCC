@@ -7,7 +7,7 @@ from torch import Tensor, cuda
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
-from classes.image_dataset import ImageDataset
+from classes.dataset import ImageDataset
 
 def preprocess(
     root_dir = 'datasets/raw', 

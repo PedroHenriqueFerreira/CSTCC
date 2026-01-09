@@ -1,20 +1,22 @@
 import torch
 
 from torch.nn import Module
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from torch.optim import Adam
+
 from torchvision.io import read_image
 from torchvision.utils import save_image
+
 from tqdm import tqdm
 
 from torch.optim import Optimizer
 
 from pathlib import Path
 
-from classes.color_blindness_simulator import ColorBlindnessSimulator
-from classes.color_correction_model import ColorCorrectionModel
-from classes.perceptual_losses import PerceptualLosses
-from classes.image_dataset import ImageDataset, image_transform
+from classes.simulator import ColorBlindnessSimulator
+from classes.model import ColorCorrectionModel
+from classes.criterion import PerceptualLosses
+from classes.dataset import ImageDataset, image_transform
 
 def run_epoch(
     loader: DataLoader, 
@@ -31,42 +33,35 @@ def run_epoch(
         model.eval()
         
     total_loss = 0.0
-  
-    # context_manager = torch.enable_grad() if train else torch.inference_mode()
-  
-    # with context_manager:  
-    progress_bar = tqdm(loader, desc='Training' if train else 'Validation')
     
-    for x, _ in progress_bar:
-        print('INITIALIZING')
+    with torch.set_grad_enabled(train):  
+        progress_bar = tqdm(loader, desc='Training' if train else 'Validation')
         
-        x = x.to(device, non_blocking=True)
-        
-        # if train:
-        #     model.train()
-        
-        type = torch.randint(0, 4, (x.size(0),), device=device)
+        for x, _ in progress_bar:
+            x = x.to(device, non_blocking=True)
+            
+            if train:
+                model.train()
+            
+            type = torch.randint(0, 4, (x.size(0),), device=device)
 
-        print('CORRECTING')
-        corrected = model(x, type)
-        print('SIMULATING')
-        simulated_corrected = simulator(corrected, type)
-        print('CALCULATING LOSS')
-        loss = criterion(x, simulated_corrected)
+            corrected = model(x, type)
+            sim_corrected = simulator(corrected, type)
+            sim = simulator(x, type)
+            loss = criterion(x, corrected, sim, sim_corrected)
 
-        if train:
-            print('BACKPROPAGATING')
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
+            if train:
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
+            
+            total_loss += loss.item()
+            
+            progress_bar.set_postfix(loss=loss.item())
+            
+            preview(model, simulator, device)
         
-        total_loss += loss.item()
-        
-        progress_bar.set_postfix(loss=loss.item())
-        
-        # preview(model, simulator, device)
-        
-    return total_loss / len(loader)
+    return total_loss
 
 def preview(model: Module, simulator: Module, device: str):
     image_path = Path('preview/image.jpg')
@@ -91,13 +86,13 @@ def preview(model: Module, simulator: Module, device: str):
             
             save_image(group, f'preview/preview_{i}.jpg', nrow=2)
 
-def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: int = 20):
+def train(processed_dir = 'datasets/processed', batch_size: int = 4, epochs: int = 20, preview_interval: int = 1):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
     processed_path = Path(processed_dir)
     
     train_dataset = ImageDataset(processed_path / 'train')
-    val_dataset = ImageDataset(processed_path / 'val')
+    # val_dataset = ImageDataset(processed_path / 'val')
     
     train_loader = DataLoader(
         dataset=train_dataset, 
@@ -111,53 +106,44 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: in
     #     dataset=val_dataset, 
     #     batch_size=batch_size, 
     #     shuffle=False, 
-    #     num_workers=0, 
+    #     num_workers=4, 
     #     pin_memory=True
     # )
 
-    color_blindness_simulator = ColorBlindnessSimulator().to(device)#.eval()
-    perceptual_losses = PerceptualLosses().to(device)#.eval()
-    color_correction_model = ColorCorrectionModel().to(device)
+    simulator = ColorBlindnessSimulator().to(device).eval()
+    criterion = PerceptualLosses().to(device).eval()
+    model = ColorCorrectionModel().to(device)
     
-    color_blindness_simulator.eval()
-    perceptual_losses.eval()
+    # NUMBER OF PARAMETERS
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
-        # NUMBER OF PARAMETERS
-    total_params = sum(p.numel() for p in color_correction_model.parameters() if p.requires_grad)
+    print(f'Trainable parameters: {total_params:,}')
     
-    print('Number of trainable parameters in Color Correction Model:', total_params)
+    # model = torch.compile(model, mode="max-autotune")
     
-    # color_correction_model = torch.compile(color_correction_model, mode="max-autotune")
+    # model = torch.compile(model)
+    # criterion = torch.compile(criterion)
     
-    # color_blindness_simulator = torch.compile(color_blindness_simulator)
-    # color_correction_model = torch.compile(color_correction_model)
-    # perceptual_losses = torch.compile(perceptual_losses)
-    
-    adam_optimizer = Adam(color_correction_model.parameters(), lr=1e-4)
-
-    # test_x = read_image('image.jpg').to(device)
-    # test_type = torch.tensor([0, 1, 2, 3]).to(device)
-    
-    # test_x = torch.stack([test_x, test_x, test_x, test_x])
+    optimizer = Adam(model.parameters(), lr=1e-4)
 
     # best_val_loss = float('inf')
     for epoch in range(epochs):
         train_loss = run_epoch(
             train_loader,
-            color_correction_model,
-            color_blindness_simulator,
-            perceptual_losses,
-            adam_optimizer,
+            model,
+            simulator,
+            criterion,
+            optimizer,
             train=True,
             device=device
         )
         
         # val_loss = run_epoch(
         #     val_loader,
-        #     color_correction_model,
-        #     color_blindness_simulator,
-        #     perceptual_losses,
-        #     adam_optimizer,
+        #     model,
+        #     simulator,
+        #     criterion,
+        #     optimizer,
         #     train=False,
         #     device=device
         # )
@@ -167,8 +153,8 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 16, epochs: in
         
         # if val_loss < best_val_loss:
             # best_val_loss = val_loss
-            # print('Saving Model...')
-            # torch.save(color_correction_model.state_dict(), 'model.pth')
+        print('Saving Model...')
+        torch.save(model.state_dict(), 'model.pth')
     
     print('Successfully trained the model!')
     
