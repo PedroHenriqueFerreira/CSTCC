@@ -119,7 +119,7 @@ def train(processed_dir = 'datasets/processed', batch_size: int = 4, epochs: int
     
     print(f'Trainable parameters: {total_params:,}')
     
-    # model = torch.compile(model, mode="max-autotune")
+    # model = torch.compile(model)
     
     # model = torch.compile(model)
     # criterion = torch.compile(criterion)

@@ -32,9 +32,10 @@ class EdgeLoss(nn.Module):
 class ColorSpreadLoss(nn.Module):
     def __init__(self):
         super().__init__()
+        self.l1_loss = nn.L1Loss()
 
     def forward(self, x: Tensor, y: Tensor) -> Tensor:
-        return -y.var(dim=(2, 3)).mean()
+        return self.l1_loss(x.var(dim=(2, 3)), y.var(dim=(2, 3)))
     
 class SSIMLoss(nn.Module):
     ''' Perceptual Loss using Structural Similarity Index (SSIM) '''
@@ -69,16 +70,17 @@ class VGGLoss(nn.Module):
         self.l1_loss = L1Loss()
 
         self.vgg = vgg19(weights=VGG19_Weights.DEFAULT).features.eval()
+        
         for param in self.vgg.parameters():
             param.requires_grad = False
         
-        # self.transforms = weights.transforms()
+        print(self.vgg)
         
         self.blocks = nn.ModuleList([
-            self.vgg[:4],    # relu1_2
-            self.vgg[4:9],   # relu2_2
-            self.vgg[9:18],  # relu3_4
-            # self.vgg[18:27], # relu4_4
+            self.vgg[0:4],    # relu1_2 [0:4]
+            # self.vgg[4:9],   # relu2_2 [4:9]
+            # self.vgg[9:18],  # relu3_4 [9:18]
+            # self.vgg[18:27], # relu4_4 [18:27]
         ])
         
         self.register_buffer('mean', torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
@@ -110,21 +112,23 @@ class PerceptualLosses(nn.Module):
     ):
         super().__init__()
 
-        self.l1 = nn.L1Loss()
-        self.vgg = VGGLoss()
-        self.contrast = ContrastiveDeltaELoss(margin=5.0)
+        # self.l1 = nn.L1Loss()
+        self.vgg_loss = VGGLoss()
+        # self.contrast = ContrastiveDeltaELoss(margin=5.0)
 
         self.w_l1 = w_l1
         self.w_vgg = w_vgg
         self.w_contrast = w_contrast
 
     def forward(self, x, corrected, sim_x, sim_corrected):
-        loss_l1 = self.l1(corrected, x)
-        loss_vgg = self.vgg(corrected, x)
-        loss_contrast = self.contrast(sim_x, sim_corrected)
+        # loss_l1 = self.l1(corrected, x)
+        # loss_vgg = self.vgg(corrected, x)
+        # loss_contrast = self.contrast(sim_x, sim_corrected)
 
-        return (
-            self.w_l1 * loss_l1
-            + self.w_vgg * loss_vgg
-            + self.w_contrast * loss_contrast
-        )
+        # return (
+        #     self.w_l1 * loss_l1
+        #     + self.w_vgg * loss_vgg
+        #     + self.w_contrast * loss_contrast
+        # )
+        
+        return self.vgg_loss(x, sim_corrected)

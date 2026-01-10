@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 
 class DoubleConv(nn.Module):
-    """(Convolução => BN => ReLU) * 2"""
+    """(Convolução => IN => ReLU) * 2"""
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.InstanceNorm2d(out_channels, affine=True),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.InstanceNorm2d(out_channels, affine=True),
             nn.ReLU(inplace=True)
         )
 
@@ -77,8 +77,6 @@ class ColorCorrectionModel(nn.Module):
         # Saída
         self.outc = nn.Conv2d(base, 3, kernel_size=1)
         
-        self.final_activation = nn.Sigmoid()
-
     def forward(self, x, condition_idx):
         B, C, H, W = x.shape
         
@@ -108,10 +106,8 @@ class ColorCorrectionModel(nn.Module):
         # 5. Saída Residual
         # A conv1x1 transforma os 32 canais em 3 canais (RGB Delta)
         delta = self.outc(x)
-        delta = self.final_activation(delta)
         
         # CORREÇÃO: Somar delta com 'input_img' (original), não com 'x' (features)
         # return torch.clamp(input_img + delta, 0.0, 1.0)
         
-        # return torch.clamp(delta, 0.0, 1.0)
-        return delta
+        return delta.sigmoid()
