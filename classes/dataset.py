@@ -1,4 +1,4 @@
-from torch import Tensor, float32
+from torch import float32, Tensor
 from torchvision.transforms import v2
 from torchvision.datasets import ImageFolder
 
@@ -28,11 +28,7 @@ class ToSquare:
             padding_mode=self.padding_mode
         )
     
-image_transform = v2.Compose([
-    v2.ToImage(),
-    ToSquare(),
-    v2.ToDtype(float32, scale=True),    
-])
+image_transform = v2.Compose([v2.ToImage(), ToSquare(), v2.ToDtype(float32, scale=True)])
     
 class ImageDataset(ImageFolder):
     def __init__(self, root: str):

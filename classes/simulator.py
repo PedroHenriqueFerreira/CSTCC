@@ -4,8 +4,6 @@ from torch import nn, tensor, Tensor
 from kornia.color import rgb_to_linear_rgb,  linear_rgb_to_rgb
 
 class ColorBlindnessSimulator(nn.Module):
-    ''' Color Vision Deficiency Simulator Based on Machado et al. (2009) '''
-
     def __init__(self):
         super().__init__()
 
@@ -36,16 +34,8 @@ class ColorBlindnessSimulator(nn.Module):
         self.register_buffer('matrices', torch.stack([protan, deutan, tritan, achrom], dim=0))
 
     def forward(self, x: Tensor, type: Tensor) -> Tensor:
-        '''Simulate color blindness on input images.
-        
-        x: (B, 3, H, W) in [0, 1]
-        type: (B,) in [0, 3]
-        '''
-        
-        x = rgb_to_linear_rgb(x)
-        
+        x = rgb_to_linear_rgb(x)        
         x = torch.einsum('bchw,btc->bthw', x, self.matrices[type])
-        
         x = linear_rgb_to_rgb(x)
         
         return x.clamp(0.0, 1.0)
