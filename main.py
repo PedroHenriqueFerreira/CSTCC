@@ -17,17 +17,14 @@ class Main:
     def __init__(
         self, 
         in_dir = 'datasets/processed', 
-        out_file = 'model.pth', 
-        epochs = 20,
-        batch_size = 4, 
+        out_file = 'model.pth',  
         lr = 1e-4, 
     ):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
         self.in_dir = Path(in_dir)
         self.out_file = Path(out_file)
-        self.epochs = epochs
-        self.batch_size = batch_size
+        
         self.lr = lr
         
         self.model = ColorCorrectionModel().to(self.device)
@@ -39,31 +36,7 @@ class Main:
         self.criterion = VGGLoss().to(self.device).eval()
         
         self.optimizer = Adam(self.model.parameters(), lr=self.lr)
-        
-        self.train_loader = DataLoader(
-            ImageDataset(self.in_dir / 'train'), 
-            batch_size=self.batch_size,
-            shuffle=True, 
-            num_workers=4, 
-            pin_memory=True
-        )
-        
-        self.val_loader = DataLoader(
-            ImageDataset(self.in_dir / 'val'), 
-            batch_size=self.batch_size, 
-            shuffle=False, 
-            num_workers=4, 
-            pin_memory=True
-        )
-        
-        self.test_loader = DataLoader(
-            ImageDataset(self.in_dir / 'test'), 
-            batch_size=self.batch_size, 
-            shuffle=False, 
-            num_workers=4, 
-            pin_memory=True
-        )
-    
+            
     def epoch(self, loader: DataLoader, train: bool, desc: str) -> float:
         if train:
             self.model.train()
@@ -92,21 +65,35 @@ class Main:
             
         return total_loss
         
-    def train(self):
-        total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+    def train(self, batch_size = 4, epochs = 20):
+        train_loader = DataLoader(
+            ImageDataset(self.in_dir / 'train'), 
+            batch_size=batch_size,
+            shuffle=True, 
+            num_workers=4, 
+            pin_memory=True
+        )
         
-        print(f'Training {total_params:,} parameters...')
+        val_loader = DataLoader(
+            ImageDataset(self.in_dir / 'val'), 
+            batch_size=batch_size, 
+            shuffle=False, 
+            num_workers=4, 
+            pin_memory=True
+        )
+        
+        total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         
         # model = torch.compile(model)
         # model = torch.compile(model)
         # criterion = torch.compile(criterion)
         
         best_val_loss = float('inf')
-        for epoch in range(self.epochs):
-            train_loss = self.epoch(self.train_loader, True, f'Training Epoch [{epoch + 1}/{self.epochs}]')
-            val_loss = self.epoch(self.val_loader, False, f'Validating Epoch [{epoch + 1}/{self.epochs}]')
+        for epoch in range(epochs):
+            train_loss = self.epoch(train_loader, True, f'Training Epoch [{epoch + 1}/{epochs}]')
+            val_loss = self.epoch(val_loader, False, f'Validating Epoch [{epoch + 1}/{epochs}]')
                     
-            print(f'Epoch [{epoch + 1}/{self.epochs}], Loss: {train_loss:.5f}, Val Loss: {val_loss:.5f}')
+            print(f'Epoch [{epoch + 1}/{epochs}], Loss: {train_loss:.5f}, Val Loss: {val_loss:.5f}')
             
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
@@ -116,16 +103,25 @@ class Main:
         
         print('Successfully trained the model!')
         
-    def test(self):
-        test_loss = self.epoch(self.test_loader, False, 'Testing')
+    def test(self, batch_size = 4):
+        test_loader = DataLoader(
+            ImageDataset(self.in_dir / 'test'), 
+            batch_size=batch_size, 
+            shuffle=False, 
+            num_workers=4, 
+            pin_memory=True
+        )
+        
+        test_loss = self.epoch(test_loader, False, 'Testing')
         
         print(f'Test Loss: {test_loss:.5f}')
 
-    def preview(self, input: str, output: str):
+    def preview(self, input = 'input.jpg', output = 'output.jpg'):
         input = Path(input)
         output = Path(output)        
         
         if not input.exists():
+            print('Input file does not exist!')
             return
         
         image = image_transform(read_image(input)).to(self.device)
@@ -156,7 +152,7 @@ if __name__ == '__main__':
     
     main = Main()
     
-    command, *args = argv[1:]
+    command, args = argv[1], argv[2:]
     
     if command == 'train':
         main.train()
