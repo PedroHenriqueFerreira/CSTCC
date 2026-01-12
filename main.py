@@ -44,6 +44,9 @@ class Main:
             progress_bar = tqdm(loader, desc=desc)
             
             for x, _ in progress_bar:
+                if train:
+                    self.model.train()
+                
                 x = x.to(self.device, non_blocking=True)
                 type = torch.randint(0, 4, (x.size(0),), device=self.device)
                 
@@ -57,6 +60,9 @@ class Main:
                 total_loss += loss.item()
                 
                 progress_bar.set_postfix(loss=loss.item())
+                
+                if train:
+                    self.preview()
             
         return total_loss
         
@@ -144,7 +150,7 @@ class Main:
         self, 
         root_path = 'datasets/raw', 
         processed_path = 'datasets/processed', 
-        batch_size = 128, 
+        batch_size = 64, 
         train_size = 0.8, 
         val_size = 0.1, 
         colorfulness_threshold = 45.0
@@ -158,7 +164,12 @@ class Main:
         
         processed_path.mkdir(parents=True, exist_ok=True)
         
-        loader = DataLoader(ImageDataset(root_path), batch_size, num_workers=4, pin_memory=True)
+        loader = DataLoader(
+            ImageDataset(root_path), 
+            batch_size, 
+            num_workers=0, 
+            pin_memory=True
+        )
         
         saved_images: set[Path] = set()        
         
