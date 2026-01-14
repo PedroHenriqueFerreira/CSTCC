@@ -223,7 +223,9 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('high')
     torch.cuda.empty_cache()
     
-    main = Main()
+    if len(argv) < 2:
+        print('Please provide a command!')
+        exit(1)
     
     command, args = argv[1], argv[2:]
     
@@ -235,6 +237,8 @@ if __name__ == '__main__':
                 args[i] = float(arg)
             except ValueError:
                 pass
+    
+    main = Main()
     
     if command == 'preprocess':
         main.preprocess(*args)
